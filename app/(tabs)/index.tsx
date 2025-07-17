@@ -1,75 +1,235 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// App.js
+import React, { useState } from "react";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Linking,
+  ActivityIndicator,
+} from "react-native";
+import axios from "axios";
 
-export default function HomeScreen() {
+//Add to use native module
+import { NativeModules, Button, Alert } from "react-native";
+const { AppLauncher } = NativeModules;
+
+type ResultItem = {
+  title: string;
+  link: string;
+  descript?: string;
+  channel?: string;
+};
+
+export default function App() {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  type ResultType = {
+    error?: string;
+    intent?: string;
+    reply?: string;
+    results?: ResultItem[];
+    message?: string;
+    app_name?: string;
+    // Add other possible fields like `reply`, `intent`, `results`, etc.
+  };
+
+  const [result, setResult] = useState<ResultType | null>(null);
+  const sendCommand = async () => {
+    if (!text.trim()) return;
+    setLoading(true);
+    setResult(null);
+    try {
+      const response = await axios.post("http://192.168.18.9:8000/process", {
+        text,
+      });
+      setResult(response.data);
+    } catch (err) {
+      setResult({ error: "Failed to fetch response from API." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+    <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>🗣️ Nepali Voice Assistant</Text>
+        <Text style={styles.subtitle}>
+          Enter a Nepali command (e.g. गुगलमा नेपालका प्रधानमन्त्री खोज)
+        </Text>
+      </View>
+
+      <TextInput
+        style={styles.textarea}
+        multiline
+        placeholder="तपाईंको आदेश लेख्नुहोस्..."
+        value={text}
+        onChangeText={setText}
+      />
+
+      <TouchableOpacity style={styles.button} onPress={sendCommand}>
+        <Text style={styles.buttonText}>पठाउनुहोस्</Text>
+      </TouchableOpacity>
+
+      {/* Loading Indicator (Conditionally Rendered) */}
+      {loading && ( // Renders only if 'loading' state is true
+        <ActivityIndicator
+          size="large"
+          color="#667eea"
+          style={{ marginTop: 20 }}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      )}
+
+      {/* TO open the app intent*/}
+      {result?.intent === "open_app" &&
+        result?.app_name && ( // Check if result is null or undefined if not then try to access app_name form the result
+          <View style={styles.results}>
+            <Text style={styles.reply}>
+              {" "}
+              The app {result.app_name} is opening
+            </Text>
+          </View>
+        )}
+
+      {/* Results Display (Conditionally Rendered) */}
+      {result &&
+        !loading && ( // Renders only if 'result' state has data and not loading
+          <View style={styles.results}>
+            {/* Intent Display */}
+
+            {result.intent && ( // Renders intent if present in result
+              <Text style={styles.intent}>🧠 Intent: {result.intent}</Text>
+            )}
+
+            {/* Reply Display */}
+            {result.reply && <Text style={styles.reply}>{result.reply}</Text>}
+
+            {/* OPEN APP IF INTENT IS open_app */}
+            {/* Show intent feedback */}
+            {result?.intent === "open_app" && result.app_name && (
+              <View style={styles.results}>
+                <Text style={styles.intent}>
+                  📱 {result.app_name} खोलिँदैछ...
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => {
+                    try {
+                      AppLauncher.openApp(result.app_name!.toLowerCase());
+                    } catch (e) {
+                      Alert.alert("Error", "Unable to open the app.");
+                    }
+                  }}
+                >
+                  <Text style={styles.buttonText}>
+                    {result.app_name} खोल्नुहोस्
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Search Results (Mapped from array) */}
+            {result.results?.map(
+              (
+                item,
+                index // Iterates over 'results' array if it exists
+              ) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.card}
+                  onPress={() => Linking.openURL(item.link)}
+                >
+                  <Text style={styles.linkTitle}>{item.title}</Text>
+                </TouchableOpacity>
+              )
+            )}
+
+            {result.message && (
+              <Text style={styles.reply}>{result.message}</Text>
+            )}
+          </View>
+        )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flexGrow: 1,
+    backgroundColor: "#eef1f7",
+    padding: 20,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  header: {
+    marginBottom: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#4b4bcb",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: "#444",
+    textAlign: "center",
+  },
+  textarea: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 15,
+    borderRadius: 10,
+    minHeight: 100,
+    backgroundColor: "#fff",
+    textAlignVertical: "top",
+  },
+  button: {
+    backgroundColor: "#667eea",
+    padding: 15,
+    marginTop: 15,
+    borderRadius: 50,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  results: {
+    marginTop: 30,
+  },
+  intent: {
+    fontSize: 16,
+    backgroundColor: "#667eea",
+    color: "#fff",
+    padding: 10,
+    borderRadius: 8,
+    textAlign: "center",
+  },
+  reply: {
+    fontSize: 15,
+    backgroundColor: "#fff",
+    padding: 10,
+    marginTop: 10,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#667eea",
+  },
+  card: {
+    backgroundColor: "#fff",
+    padding: 10,
+    marginTop: 10,
+    borderRadius: 10,
+    elevation: 2,
+  },
+  linkTitle: {
+    fontSize: 15,
+    color: "#1a73e8",
+    fontWeight: "500",
   },
 });
