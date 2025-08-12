@@ -5,9 +5,9 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-GOOGLE_API_KEY = "AIzaSyCRIg6e5YVx4nznzkUlUpkXq_FtXOIzB38"
-GOOGLE_CSE_ID = "501d31ec2746c4074"
-YOUTUBE_API_KEY = "AIzaSyCRIg6e5YVx4nznzkUlUpkXq_FtXOIzB38"
+GOOGLE_API_KEY = "Your_Google_Api_Key"
+GOOGLE_CSE_ID = "Your_Google_CSE_id"
+YOUTUBE_API_KEY = "Your_Youtube_APi_key"
 
 def get_rasa_result(text):
     res = requests.post("http://localhost:5005/model/parse", json={"text": text})
